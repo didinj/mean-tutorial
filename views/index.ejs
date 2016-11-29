@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html ng-app="app">
+  <head>
+    <title><%= title %></title>
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+  </head>
+  <body>
+    <ng-view></ng-view>
+
+    <!-- Libraries -->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.25/angular.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.25/angular-route.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.25/angular-resource.min.js"></script>
+
+    <!-- Template -->
+    <script type="text/ng-template" id="/cats.html">
+      Search: <input type="text" ng-model="search.cat_name">
+      <ul>
+        <li ng-repeat="cat in cats | filter: search">
+          <a ng-show="!editing[$index]" href="#/{{cat._id}}">{{cat.cat_name}}</a>
+          <button ng-show="!editing[$index]" ng-click="edit($index)">edit</button>
+          <input ng-show="editing[$index]" type="text" ng-model="cat.cat_name" value="cat.cat_name">
+          <button ng-show="editing[$index]" ng-click="update($index)">Update</button>
+          <button ng-show="editing[$index]" ng-click="cancel($index)">Cancel</button>
+          <button ng-show="!editing[$index]" ng-click="remove($index)">remove</button>
+        </li>
+      </ul>
+
+      New category :<br>
+      <input type="text" ng-model="cat.cat_name"><br>
+      <input type="text" ng-model="cat.cat_desc"><br>
+      <button ng-click="save()">Create</button>
+    </script>
+
+    <script type="text/ng-template" id="/catDetails.html">
+      <h1>Category Detail</h1>
+      Category Name: <input type="text" ng-model="cat.cat_name" /><br>
+      Category Desc: <input type="text" ng-model="cat.cat_desc" /><br>
+      <button ng-click="update()">Update</button><br>
+      <a href="/">Cancel</a><br>
+      <button ng-click="remove()">Remove</button>
+    </script>
+
+    <script>
+      angular.module('app', ['ngRoute', 'ngResource'])
+
+        //---------------
+        // Services
+        //---------------
+
+        .factory('Cats', ['$resource', function($resource){
+          return $resource('/cats/:id', null, {
+            'update': { method:'PUT' }
+          });
+        }])
+
+        //---------------
+        // Controllers
+        //---------------
+
+        .controller('CatController', ['$scope', 'Cats', function ($scope, Cats) {
+          $scope.editing = [];
+          $scope.cats = Cats.query();
+
+          $scope.save = function(){
+            if(!$scope.cat || $scope.cat.length < 1) return;
+            var cat = new Cats({ cat_name: $scope.cat.cat_name, cat_desc: $scope.cat.cat_desc });
+            cat.$save(function(){
+              $scope.cats.push(cat);
+              $scope.cat.cat_name = ''; // clear textbox
+              $scope.cat.cat_desc = ''; // clear textbox
+            });
+          }
+
+          $scope.update = function(index){
+            var cat = $scope.cats[index];
+            Cats.update({id: cat._id}, cat);
+            $scope.editing[index] = false;
+          }
+
+          $scope.edit = function(index){
+            $scope.editing[index] = angular.copy($scope.cats[index]);
+          }
+
+          $scope.cancel = function(index){
+            $scope.cats[index] = angular.copy($scope.editing[index]);
+            $scope.editing[index] = false;
+          }
+
+          $scope.remove = function(index){
+            var cat = $scope.cats[index];
+            Cats.remove({id: cat._id}, function(){
+              $scope.cats.splice(index, 1);
+            });
+          }
+        }])
+
+        .controller('CatDetailCtrl', ['$scope', '$location', '$routeParams', 'Cats', function ($scope, $location, $routeParams, Cats) {
+          $scope.cat = Cats.get({id: $routeParams.id });
+
+          $scope.update = function(){
+            Cats.update({id: $scope.cat._id}, $scope.cat, function(){
+              $location.url('/');
+            });
+          }
+
+          $scope.remove = function(){
+            Cats.remove({id: $scope.cat._id}, function(){
+              $location.url('/');
+            });
+          }
+        }])
+
+        //---------------
+        // Routes
+        //---------------
+
+        .config(['$routeProvider', function ($routeProvider) {
+          $routeProvider
+            .when('/', {
+              templateUrl: '/cats.html',
+              controller: 'CatController'
+            })
+
+            .when('/:id', {
+              templateUrl: '/catDetails.html',
+              controller: 'CatDetailCtrl'
+           });
+        }]);
+    </script>
+  </body>
+</html>
